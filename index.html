@@ -367,6 +367,76 @@ dialog::backdrop { background: rgba(10,15,22,.55); }
 .m-foot .next .lbl { text-align: right; }
 
 /* =====================================================================
+   6 bis. APUNTES EN VIVO (Google Docs vía Apps Script)
+   ===================================================================== */
+.vivo-ctrl { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
+.vivo-estado {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-size: .8rem; color: var(--ink-2); background: none; border: 0; padding: .2rem .1rem;
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
+}
+.vivo-estado:hover { text-decoration-color: currentColor; }
+.vivo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); flex: none; }
+.vivo-dot[data-tipo="ok"] { background: var(--ok); }
+.vivo-dot[data-tipo="cargando"] { background: var(--accent); animation: latido 1s ease-in-out infinite; }
+.vivo-dot[data-tipo="aviso"] { background: var(--warn); }
+.vivo-dot[data-tipo="error"] { background: #C0392B; }
+@keyframes latido { 50% { opacity: .3; } }
+#btnActualizar[disabled] { opacity: .65; cursor: progress; }
+#btnActualizar .giro { display: inline-block; }
+#btnActualizar[disabled] .giro { animation: girar 1s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+
+.vivo-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 50;
+  width: min(640px, 100vw);
+  display: flex; flex-direction: column;
+  background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow);
+  transform: translateX(102%); transition: transform .25s ease;
+}
+body.vivo-open .vivo-panel { transform: none; }
+body.vivo-open .scrim { display: block; position: fixed; inset: 0; z-index: 45; background: rgba(10,15,22,.45); }
+.vivo-head { flex: none; padding: 1rem 1.2rem .9rem; border-bottom: 1px solid var(--line); }
+.vivo-head-top { display: flex; align-items: center; gap: .6rem; }
+.vivo-head h2 { margin: 0; font-family: var(--serif); font-size: 1.35rem; font-weight: 600; margin-right: auto; }
+.vivo-meta { margin: .45rem 0 .7rem; font-size: .86rem; color: var(--ink-2); display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
+.vivo-acciones { display: flex; gap: .5rem; flex-wrap: wrap; }
+.vivo-body { flex: 1 1 auto; overflow-y: auto; padding: 1rem 1.2rem 2rem; }
+.vivo-msg {
+  border-radius: 8px; padding: .75rem .95rem; font-size: .92rem; line-height: 1.55; margin-bottom: 1rem;
+  border-left: 4px solid var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--surface));
+}
+.vivo-msg.error { border-left-color: #C0392B; background: color-mix(in srgb, #C0392B 9%, var(--surface)); }
+.vivo-msg p { margin: 0 0 .4rem; }
+.vivo-msg p:last-child { margin-bottom: 0; }
+.vivo-msg .detalle { font-size: .8rem; color: var(--ink-2); }
+.vivo-tab { border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: .75rem; background: var(--surface-2); overflow: hidden; }
+.vivo-tab > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: .7rem;
+  padding: .85rem 1rem; font-family: var(--serif); font-size: 1.15rem; font-weight: 600;
+}
+.vivo-tab > summary::-webkit-details-marker { display: none; }
+.vivo-tab > summary::before {
+  content: ""; width: 9px; height: 9px; flex: none;
+  border-right: 2px solid var(--ink-2); border-bottom: 2px solid var(--ink-2);
+  transform: rotate(-45deg); transition: transform .2s;
+}
+.vivo-tab[open] > summary::before { transform: rotate(45deg); }
+.vivo-tab > summary .vivo-palabras { margin-left: auto; font-family: var(--sans); font-size: .78rem; font-weight: 400; color: var(--ink-3); }
+.vivo-texto {
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding: .9rem 1.15rem 1.1rem;
+  font-family: var(--serif); font-size: 1.05rem; line-height: 1.7; max-width: 72ch;
+  overflow-wrap: anywhere;
+}
+.vivo-texto p { margin: 0 0 .45rem; }
+.vivo-texto p.sangria { padding-left: 1.2rem; color: var(--ink); }
+.vivo-texto h4 { margin: 1.1rem 0 .4rem; font-family: var(--sans); font-size: .95rem; letter-spacing: .01em; color: var(--accent); }
+.vivo-texto ul { margin: 0 0 .6rem; padding-left: 1.3rem; }
+.vivo-texto li { margin-bottom: .25rem; }
+.vivo-vacio { color: var(--ink-3); font-style: italic; }
+
+/* =====================================================================
    7. CELULAR Y TABLET
    ===================================================================== */
 @media (max-width: 700px) {
@@ -380,6 +450,8 @@ dialog::backdrop { background: rgba(10,15,22,.55); }
   .filtros { display: none; width: 100%; }
   body.filtros-open .filtros { display: flex; }
   .stage { min-height: 440px; }
+  .vivo-ctrl { width: 100%; }
+  .vivo-head, .vivo-body { padding-left: 1rem; padding-right: 1rem; }
   .search { order: 3; flex-basis: 100%; max-width: none; }
   .top-actions .btn .txt { display: none; }
   .contador { margin-left: 0; }
@@ -453,6 +525,15 @@ dialog::backdrop { background: rgba(10,15,22,.55); }
     <button class="btn" id="btnLimpiar">Limpiar filtros</button>
   </div>
   <span class="contador" id="contador" aria-live="polite"></span>
+  <!-- Apuntes en vivo: botón para actualizar y estado de la conexión -->
+  <div class="vivo-ctrl">
+    <button class="btn" id="btnVivo" aria-controls="vivoPanel" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg>
+      Apuntes en vivo
+    </button>
+    <button class="btn" id="btnActualizar"><span class="giro" aria-hidden="true">↻</span> Actualizar apuntes</button>
+    <button class="vivo-estado" id="vivoEstadoBarra" title="Ver apuntes en vivo"><span class="vivo-dot" aria-hidden="true"></span><span class="txt"></span></button>
+  </div>
 </div>
 
 <div class="oral-banner">
@@ -493,6 +574,23 @@ dialog::backdrop { background: rgba(10,15,22,.55); }
   </div>
 </aside>
 <div class="scrim" id="scrim"></div>
+
+<!-- ===================== APUNTES EN VIVO ===================== -->
+<section class="vivo-panel" id="vivoPanel" aria-labelledby="vivoTitulo" aria-hidden="true">
+  <div class="vivo-head">
+    <div class="vivo-head-top">
+      <h2 id="vivoTitulo">Apuntes en vivo</h2>
+      <button class="btn btn-icon" id="btnCerrarVivo" aria-label="Cerrar apuntes en vivo">✕</button>
+    </div>
+    <div class="vivo-meta" id="vivoMeta" aria-live="polite"><span class="vivo-dot" aria-hidden="true"></span><span class="txt"></span></div>
+    <div class="vivo-acciones">
+      <button class="btn" id="btnActualizarPanel"><span aria-hidden="true">↻</span> Actualizar apuntes</button>
+      <button class="btn" id="btnAbrirTodas">Abrir todas</button>
+      <button class="btn" id="btnCerrarTodas">Cerrar todas</button>
+    </div>
+  </div>
+  <div class="vivo-body" id="vivoContenido"></div>
+</section>
 
 <!-- Ventana del tema -->
 <dialog id="modal" aria-labelledby="modalTitulo"></dialog>
@@ -3284,6 +3382,264 @@ $("#archivoImportar").addEventListener("change", e => {
 
 
 /* =====================================================================
+   M bis. APUNTES EN VIVO (Google Docs vía Google Apps Script)
+   ---------------------------------------------------------------------
+   La página consulta la URL al abrirse y cada vez que se toca
+   "Actualizar apuntes". La conexión usa JSONP: se agrega a la página un
+   <script> que apunta a la URL con el parámetro "callback", y Apps Script
+   responde llamando a esa función con los datos. Así funciona desde una
+   página local (doble clic) y desde GitHub Pages.
+   Datos esperados: una lista de pestañas
+   [ { "titulo": "Pestaña 1", "texto": "..." }, ... ]
+   o un objeto { pestanas: [...] }. Si el script falla, { error: "..." }.
+   La última respuesta correcta se guarda en este navegador, así que si
+   no hay conexión se muestra esa copia, con un aviso.
+   Esta sección NO modifica la línea temporal.
+   ===================================================================== */
+const APUNTES_URL = "https://script.google.com/macros/s/AKfycbzLR5JObPrNExCqz7SuYfQT-bvUajiz9r4gri0gxFo3UUbxtjFrXVsvDeuszzIQ4HAeOw/exec";
+const CLAVE_VIVO = "hem_vivo_cache";
+
+const vivo = { pestanas: null, fecha: null, desdeCache: false, error: null, cargando: false };
+
+/* Acepta el formato esperado y algunas variantes parecidas */
+function normalizarPestanas(json) {
+  // Apps Script puede avisar un error propio: { error: "..." }
+  if (json && !Array.isArray(json) && typeof json === "object" && json.error && !Array.isArray(json.pestanas)) {
+    const e = new Error(String(json.error));
+    e.tipo = "script";
+    throw e;
+  }
+  let lista = json;
+  if (lista && !Array.isArray(lista) && typeof lista === "object") {
+    lista = lista.pestanas || lista["pestañas"] || lista.tabs || lista.data || lista.items ||
+            Object.values(lista).find(Array.isArray);
+  }
+  if (!Array.isArray(lista)) {
+    const e = new Error("formato");
+    e.tipo = "formato";
+    throw e;
+  }
+  return lista.map((p, i) => {
+    if (typeof p === "string") return { titulo: "Pestaña " + (i + 1), texto: p };
+    p = p || {};
+    const titulo = p.titulo ?? p.title ?? p.nombre ?? p.name;
+    const texto = p.texto ?? p.text ?? p.contenido ?? p.content ?? "";
+    return { titulo: vacio(titulo) ? "Pestaña " + (i + 1) : String(titulo), texto: String(texto) };
+  });
+}
+
+/* Traduce cualquier falla a un mensaje claro */
+function mensajeError(e) {
+  if (e && e.tipo === "script") return {
+    texto: "El script de Google respondió con un error.",
+    detalle: "Mensaje de Apps Script: " + e.message };
+  if (e && e.tipo === "tiempo") return {
+    texto: "Google no respondió a tiempo.",
+    detalle: "Revisá tu conexión y probá de nuevo con “Actualizar apuntes”." };
+  if (e && e.tipo === "sinRespuesta") return {
+    texto: "La URL respondió, pero no con los datos esperados.",
+    detalle: "Suele pasar si el código de Apps Script todavía no acepta el parámetro “callback”, o si la implementación pide iniciar sesión. Revisá que hayas pegado el código nuevo, que hayas creado una nueva versión de la implementación y que el acceso sea “Cualquier usuario”." };
+  if (e && e.tipo === "formato") return {
+    texto: "Los datos llegaron, pero no tienen la forma esperada.",
+    detalle: "Se espera una lista de pestañas, cada una con “titulo” y “texto”." };
+  return {
+    texto: "No se pudo conectar con tus apuntes de Google Docs.",
+    detalle: "Revisá que tengas conexión a internet. Si la tenés, revisá en Apps Script (Implementar → Gestionar implementaciones) que la implementación esté activa y con acceso para “Cualquier usuario”." };
+}
+
+function leerCacheVivo() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CLAVE_VIVO) || "null");
+    if (c && Array.isArray(c.pestanas)) return { pestanas: c.pestanas, fecha: new Date(c.fecha) };
+  } catch (e) {}
+  return null;
+}
+
+/* ---------- Conexión JSONP ----------
+   Pide los datos agregando un <script>. Devuelve una promesa que se
+   resuelve con los datos o se rechaza con un error con "tipo". */
+const ESPERA_MAXIMA_JSONP = 20000;   // 20 segundos
+let contadorJsonp = 0;
+
+function pedirJsonp(urlBase) {
+  return new Promise((resolver, rechazar) => {
+    const nombre = "hemApuntesCallback_" + Date.now() + "_" + (++contadorJsonp);
+    const script = document.createElement("script");
+    let terminado = false;
+    let espera = null;
+
+    const terminar = () => {
+      terminado = true;
+      clearTimeout(espera);
+      // Si la respuesta llega tarde, se ignora sin generar errores
+      window[nombre] = function () {};
+      setTimeout(() => { try { delete window[nombre]; } catch (e) { window[nombre] = undefined; } }, 60000);
+      script.remove();
+    };
+    const fallar = (tipo, mensaje) => {
+      if (terminado) return;
+      terminar();
+      const e = new Error(mensaje);
+      e.tipo = tipo;
+      rechazar(e);
+    };
+
+    // Apps Script llama a esta función con los datos
+    window[nombre] = datos => {
+      if (terminado) return;
+      terminar();
+      resolver(datos);
+    };
+
+    espera = setTimeout(() => fallar("tiempo", "Tiempo de espera agotado"), ESPERA_MAXIMA_JSONP);
+
+    // Si el script cargó pero no llamó a la función, la respuesta no era JSONP
+    script.onload = () => setTimeout(() => fallar("sinRespuesta", "La respuesta no llamó al callback"), 0);
+    script.onerror = () => fallar("red", "No se pudo cargar el script de Google");
+
+    // Llamada: URL + "?callback=nombreDelCallback".
+    // Como el nombre del callback es único en cada consulta, el navegador
+    // nunca reutiliza una respuesta vieja.
+    script.src = urlBase + "?callback=" + encodeURIComponent(nombre);
+    script.async = true;
+    document.head.appendChild(script);
+  });
+}
+
+function cargarApuntes() {
+  if (vivo.cargando) return;
+  vivo.cargando = true;
+  renderVivo();
+
+  pedirJsonp(APUNTES_URL)
+    .then(datos => {
+      vivo.pestanas = normalizarPestanas(datos);
+      vivo.fecha = new Date();
+      vivo.desdeCache = false;
+      vivo.error = null;
+      // Se guarda la última versión válida en este navegador
+      try { localStorage.setItem(CLAVE_VIVO, JSON.stringify({ fecha: vivo.fecha.toISOString(), pestanas: vivo.pestanas })); }
+      catch (e) { /* si no entra en el navegador, se muestra igual */ }
+    })
+    .catch(error => {
+      console.warn("Apuntes en vivo:", error && error.message ? error.message : error);
+      vivo.error = mensajeError(error);
+      // Sin datos en pantalla: se intenta mostrar la última versión guardada
+      if (!vivo.pestanas) {
+        const c = leerCacheVivo();
+        if (c) { vivo.pestanas = c.pestanas; vivo.fecha = c.fecha; vivo.desdeCache = true; }
+      }
+    })
+    .then(() => {
+      vivo.cargando = false;
+      renderVivo();
+    });
+}
+
+function fechaLegible(d) {
+  if (!(d instanceof Date) || isNaN(d)) return "";
+  const hoy = new Date();
+  const hora = d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+  const mismoDia = d.toDateString() === hoy.toDateString();
+  return mismoDia ? "hoy a las " + hora : d.toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" }) + " a las " + hora;
+}
+
+/* Estado corto: { tipo, texto } */
+function estadoVivo() {
+  if (vivo.cargando) return { tipo: "cargando", texto: vivo.pestanas ? "Actualizando apuntes…" : "Cargando apuntes…" };
+  if (vivo.error && vivo.pestanas) return { tipo: "aviso", texto: "No se pudo actualizar. Mostrando la versión de " + fechaLegible(vivo.fecha) };
+  if (vivo.error) return { tipo: "error", texto: "No se pudieron cargar los apuntes" };
+  if (vivo.pestanas) return { tipo: "ok", texto: "Última actualización: " + fechaLegible(vivo.fecha) };
+  return { tipo: "", texto: "Apuntes sin cargar" };
+}
+
+/* Convierte el texto plano del documento en párrafos, títulos y viñetas */
+function renderTextoVivo(texto) {
+  const lineas = String(texto || "").replace(/\r\n?/g, "\n").split("\n");
+  let html = "", lista = "";
+  const cerrarLista = () => { if (lista) { html += "<ul>" + lista + "</ul>"; lista = ""; } };
+  for (const bruta of lineas) {
+    const l = bruta.trim();
+    if (!l) { cerrarLista(); continue; }
+    const vineta = l.match(/^[-•*●▪◦]\s+(.*)$/);
+    if (vineta) { lista += "<li>" + esc(vineta[1]) + "</li>"; continue; }
+    cerrarLista();
+    const letras = l.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, "");
+    const esTitulo = l.length <= 70 && letras.length >= 4 && letras === letras.toUpperCase();
+    const sangria = /^(\s{2,}|\t)/.test(bruta) || /^[⤷↳]/.test(l);
+    if (esTitulo) html += "<h4>" + esc(l) + "</h4>";
+    else html += '<p' + (sangria ? ' class="sangria"' : "") + ">" + esc(l) + "</p>";
+  }
+  cerrarLista();
+  return html || '<p class="vivo-vacio">Esta pestaña está vacía.</p>';
+}
+
+function renderVivo() {
+  const est = estadoVivo();
+  // Barra de herramientas y encabezado del panel
+  // En la barra se muestra una versión corta; en el panel, la completa
+  const hora = vivo.fecha instanceof Date && !isNaN(vivo.fecha)
+    ? vivo.fecha.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }) : "";
+  const corto = { cargando: "Conectando…", ok: "Conectado. Actualizado a las " + hora,
+                  aviso: "Sin actualizar (versión de las " + hora + ")", error: "Error de conexión" }[est.tipo] || est.texto;
+  [[$("#vivoEstadoBarra"), corto], [$("#vivoMeta"), est.texto]].forEach(([el, texto]) => {
+    el.querySelector(".vivo-dot").dataset.tipo = est.tipo;
+    el.querySelector(".txt").textContent = texto;
+  });
+  $("#vivoEstadoBarra").title = est.texto + ". Tocá para ver los apuntes en vivo.";
+  [$("#btnActualizar"), $("#btnActualizarPanel")].forEach(b => { b.disabled = vivo.cargando; });
+
+  // Contenido: se conservan abiertas las pestañas que ya estaban abiertas
+  const cont = $("#vivoContenido");
+  const abiertas = new Set([...cont.querySelectorAll("details[open]")].map(d => d.dataset.titulo));
+  let html = "";
+  if (vivo.error) {
+    html += `<div class="vivo-msg ${vivo.pestanas ? "" : "error"}" role="alert">
+      <p><strong>${esc(vivo.error.texto)}</strong></p>
+      ${vivo.pestanas ? `<p>Se sigue mostrando la última versión que se pudo descargar (${esc(fechaLegible(vivo.fecha))}).</p>` : ""}
+      <p class="detalle">${esc(vivo.error.detalle)}</p>
+    </div>`;
+  }
+  if (vivo.pestanas) {
+    if (!vivo.pestanas.length) html += `<p class="vivo-vacio">El documento no devolvió ninguna pestaña.</p>`;
+    html += vivo.pestanas.map(p => {
+      const palabras = (String(p.texto).match(/\S+/g) || []).length;
+      return `<details class="vivo-tab" data-titulo="${esc(p.titulo)}" ${abiertas.has(p.titulo) ? "open" : ""}>
+        <summary><span>${esc(p.titulo)}</span><span class="vivo-palabras">${palabras.toLocaleString("es-AR")} palabras</span></summary>
+        <div class="vivo-texto">${renderTextoVivo(p.texto)}</div>
+      </details>`;
+    }).join("");
+  } else if (vivo.cargando) {
+    html += `<p class="vivo-vacio">Cargando los apuntes desde Google Docs…</p>`;
+  }
+  cont.innerHTML = html;
+}
+
+function abrirVivo() {
+  document.body.classList.add("vivo-open");
+  $("#vivoPanel").setAttribute("aria-hidden", "false");
+  $("#btnVivo").setAttribute("aria-expanded", "true");
+  setTimeout(() => $("#btnCerrarVivo").focus(), 50);
+}
+function cerrarVivo() {
+  if (!document.body.classList.contains("vivo-open")) return;
+  document.body.classList.remove("vivo-open");
+  $("#vivoPanel").setAttribute("aria-hidden", "true");
+  $("#btnVivo").setAttribute("aria-expanded", "false");
+  $("#btnVivo").focus({ preventScroll: true });
+}
+$("#btnVivo").addEventListener("click", abrirVivo);
+$("#vivoEstadoBarra").addEventListener("click", abrirVivo);
+$("#btnCerrarVivo").addEventListener("click", cerrarVivo);
+$("#scrim").addEventListener("click", cerrarVivo);
+$("#btnActualizar").addEventListener("click", cargarApuntes);
+$("#btnActualizarPanel").addEventListener("click", cargarApuntes);
+$("#btnAbrirTodas").addEventListener("click", () => document.querySelectorAll("#vivoContenido details").forEach(d => d.open = true));
+$("#btnCerrarTodas").addEventListener("click", () => document.querySelectorAll("#vivoContenido details").forEach(d => d.open = false));
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !dlg.open) cerrarVivo(); });
+
+
+/* =====================================================================
    N. INICIO
    ===================================================================== */
 $("#btnFiltros").addEventListener("click", () => {
@@ -3295,6 +3651,8 @@ renderSelects();
 aplicarOral();
 aplicarFiltros();
 aplicarCompacto();
+renderVivo();
+cargarApuntes();   // consulta automática de los apuntes al abrir la página
 </script>
 </body>
 </html>
