@@ -435,6 +435,17 @@ body.vivo-open .scrim { display: block; position: fixed; inset: 0; z-index: 45; 
 .vivo-texto ul { margin: 0 0 .6rem; padding-left: 1.3rem; }
 .vivo-texto li { margin-bottom: .25rem; }
 .vivo-vacio { color: var(--ink-3); font-style: italic; }
+/* Resumen de temas detectados en los apuntes */
+.vivo-temas { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: .75rem .95rem; margin-bottom: 1rem; font-size: .92rem; line-height: 1.5; background: var(--surface); }
+.vivo-temas p { margin: 0 0 .45rem; }
+.vivo-temas ul { list-style: none; margin: .3rem 0 0; padding: 0; }
+.vivo-temas li { margin: 0 0 .25rem; }
+.vivo-temas li button { border: 0; background: none; padding: .15rem 0; text-align: left; color: var(--ink); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.vivo-temas li button:hover { text-decoration-color: currentColor; }
+.vivo-temas .tipo { display: inline-block; min-width: 5.6rem; font-size: .75rem; font-weight: 600; color: var(--accent); }
+.vivo-temas .tipo.act { color: var(--ok); }
+.vivo-temas .avisos { margin-top: .6rem; color: var(--ink-2); font-size: .85rem; }
+.vivo-temas .avisos li { list-style: disc; margin-left: 1.1rem; }
 
 /* =====================================================================
    7. CELULAR Y TABLET
@@ -2837,6 +2848,11 @@ const TEMAS = temas
   .sort((a, b) => (a.anio - b.anio) || ((b.hito ? 1 : 0) - (a.hito ? 1 : 0)) || (a._i - b._i));
 (function () { const v = new Set(); TEMAS.forEach(t => { if (v.has(t.id)) console.warn("ID repetido:", t.id); v.add(t.id); }); })();
 
+/* Copia intacta de los temas originales ya preparados. Cada vez que llegan
+   los apuntes de Google Docs, la línea se arma de nuevo a partir de esta
+   copia: el array "temas" del HTML nunca se modifica. */
+const TEMAS_BASE = TEMAS.map(t => Object.assign({}, t));
+
 
 /* =====================================================================
    F. FILTROS
@@ -2905,6 +2921,7 @@ function htmlTarjeta(t, lado) {
         <span>${esc(t.periodo)}</span>
         ${est !== "no" ? `<span class="estado-txt">${ESTADOS[est]}</span>` : ""}
         ${!vacio(notas[t.id]) ? `<span class="has-note">Nota</span>` : ""}
+        ${t.desdeDoc ? `<span class="tag-ejemplo">Google Docs</span>` : ""}
       </span>
     </button>
   </div>`;
@@ -3222,6 +3239,7 @@ function htmlExplicacion(t) {
   }).join("");
   if (!vacio(t.aviso)) h += `<div class="m-aviso"><strong>Corrección a tus apuntes:</strong> ${inline(t.aviso)}</div>`;
   if (!vacio(t.complemento)) h += `<div class="m-fuente"><strong>Sobre las fuentes:</strong> ${inline(t.complemento)}</div>`;
+  if (!vacio(t.notaDoc)) h += `<div class="m-fuente"><strong>Google Docs:</strong> ${inline(t.notaDoc)}</div>`;
   return h;
 }
 
@@ -3532,6 +3550,11 @@ function cargarApuntes() {
     })
     .then(() => {
       vivo.cargando = false;
+      // Convierte los bloques TEMA: en tarjetas de la línea temporal
+      if (vivo.pestanas) {
+        try { aplicarTemasDoc(vivo.pestanas); }
+        catch (e) { console.warn("Temas de Google Docs:", e); resumenDoc = { error: true, temas: [], avisos: [] }; }
+      }
       renderVivo();
     });
 }
@@ -3600,6 +3623,7 @@ function renderVivo() {
       <p class="detalle">${esc(vivo.error.detalle)}</p>
     </div>`;
   }
+  if (vivo.pestanas) html += htmlResumenDoc();
   if (vivo.pestanas) {
     if (!vivo.pestanas.length) html += `<p class="vivo-vacio">El documento no devolvió ninguna pestaña.</p>`;
     html += vivo.pestanas.map(p => {
@@ -3614,6 +3638,303 @@ function renderVivo() {
   }
   cont.innerHTML = html;
 }
+
+/* =====================================================================
+   M ter. TEMAS DESDE GOOGLE DOCS
+   ---------------------------------------------------------------------
+   Dentro de los apuntes, cada bloque que empieza con una línea
+   "TEMA: ..." se convierte en una tarjeta de la línea temporal.
+   El bloque termina en el siguiente "TEMA:", en una línea "FIN" o al
+   final de la pestaña. El texto fuera de los bloques no crea tarjetas.
+   Las etiquetas van en MAYÚSCULAS, seguidas de dos puntos:
+     TEMA, AÑO, PERIODO, CONTEXTO, CAUSAS, PROCESO, CONSECUENCIAS,
+     CONEXION, IDEA CLAVE, RESPUESTA ORAL
+   Opcionales: ID, QUÉ ES, CÓMO FUNCIONA, IMPORTANCIA, AUTOR, CONCEPTOS.
+   Si el tema ya existe (mismo id o mismo título), se completa el
+   existente en lugar de crear un duplicado.
+   ===================================================================== */
+const ETIQUETAS_DOC = {
+  "ID": "id",
+  "TEMA": "titulo",
+  "AÑO": "anioTexto", "ANO": "anioTexto", "ANIO": "anioTexto", "FECHA": "anioTexto",
+  "PERIODO": "periodo", "EDAD": "periodo",
+  "CONTEXTO": "contexto",
+  "QUE ES": "queEs",
+  "COMO FUNCIONA": "comoFunciona",
+  "CAUSAS": "causas",
+  "PROCESO": "proceso",
+  "IMPORTANCIA": "importancia",
+  "CONSECUENCIAS": "consecuencias",
+  "CONEXION": "conexion",
+  "IDEA CLAVE": "ideaClave", "CONCEPTO CLAVE": "ideaClave",
+  "AUTOR": "autor", "IDEA DE AUTOR": "autor",
+  "CONCEPTOS": "conceptos",
+  "RESPUESTA ORAL": "respuestaOral"
+};
+const CAMPOS_LISTA_DOC = ["causas", "consecuencias"];
+const CAMPOS_TEXTO_DOC = ["contexto", "queEs", "comoFunciona", "causas", "proceso", "importancia",
+                          "consecuencias", "conexion", "ideaClave", "autor", "respuestaOral"];
+const VINETA_DOC = /^[-•*●▪◦‣]\s*/;
+
+let resumenDoc = null;   // { temas: [{ id, titulo, fecha, tipo }], avisos: [] }
+
+/* Reconoce una línea de etiqueta: "CAUSAS:" o "TEMA: New Deal" */
+function leerEtiqueta(linea) {
+  const m = linea.match(/^\s*(?:[-•*●▪◦‣]\s*)?([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ ]{0,24}?)\s*:\s*(.*)$/);
+  if (!m) return null;
+  const etiqueta = m[1].trim();
+  if (etiqueta !== etiqueta.toUpperCase()) return null;   // solo en mayúsculas
+  const clave = etiqueta.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toUpperCase();
+  const clave2 = etiqueta.replace(/\s+/g, " ").toUpperCase();
+  const campo = ETIQUETAS_DOC[clave2] || ETIQUETAS_DOC[clave];
+  return campo ? { campo, resto: m[2] } : null;
+}
+
+/* Separa una pestaña en bloques TEMA: (devuelve los valores en bruto) */
+function separarBloques(texto) {
+  const lineas = String(texto || "").replace(/\r\n?|\u000b/g, "\n").replace(/\u00a0/g, " ").split("\n");
+  const bloques = [];
+  let actual = null, campo = null;
+  for (const linea of lineas) {
+    const et = leerEtiqueta(linea);
+    if (et && et.campo === "titulo") {
+      actual = { titulo: et.resto.trim(), valores: {} };
+      bloques.push(actual);
+      campo = null;
+      continue;
+    }
+    if (!actual) continue;                                   // texto normal: no crea tarjetas
+    if (/^\s*FIN(\s+(DEL\s+)?TEMA)?\s*:?\s*$/.test(linea)) { actual = null; campo = null; continue; }
+    if (et) {
+      campo = et.campo;
+      actual.valores[campo] = [];
+      if (et.resto.trim()) actual.valores[campo].push(et.resto);
+      continue;
+    }
+    if (campo) actual.valores[campo].push(linea);
+  }
+  return bloques;
+}
+
+/* Limpia el texto de un campo; en causas y consecuencias, cada renglón es una viñeta */
+function limpiarCampoDoc(lineas, comoLista) {
+  if (!lineas) return "";
+  let ls = lineas.map(l => l.replace(/\s+$/, ""));
+  while (ls.length && !ls[0].trim()) ls.shift();
+  while (ls.length && !ls[ls.length - 1].trim()) ls.pop();
+  if (comoLista) {
+    return ls.filter(l => l.trim()).map(l => "- " + l.trim().replace(VINETA_DOC, "")).join("\n");
+  }
+  return ls.map(l => {
+    const t = l.trim();
+    return VINETA_DOC.test(t) && t.length > 1 ? "- " + t.replace(VINETA_DOC, "") : t;
+  }).join("\n");
+}
+
+/* "1933" → 1933 · "1914–1918" → 1914 a 1918 · "c. 3500 a.C." → -3500 · "Siglo XIV" → 1301 */
+function interpretarAnio(texto) {
+  const t = normalizar(texto);
+  if (!t.trim()) return null;
+  const antesDeCristo = /\ba\.?\s*c\b\.?|antes de cristo/.test(t);
+  const signo = antesDeCristo ? -1 : 1;
+  const numeros = (t.match(/\d{1,3}(?:\.\d{3})+|\d+/g) || [])
+    .map(n => parseInt(n.replace(/\./g, ""), 10))
+    .filter(n => !isNaN(n) && n <= (antesDeCristo ? 100000 : 2200));
+  if (numeros.length) {
+    const anio = signo * numeros[0];
+    const anioFin = numeros.length > 1 ? signo * numeros[1] : null;
+    return { anio, anioFin: anioFin !== null && anioFin !== anio ? anioFin : null };
+  }
+  const siglos = (t.match(/\b[ivxlc]+\b/g) || []).map(romanoANumero).filter(n => n > 0 && n <= 22);
+  if (/siglo/.test(t) && siglos.length) {
+    const a = siglos[0], b = siglos[siglos.length - 1];
+    return antesDeCristo
+      ? { anio: -a * 100, anioFin: -(b - 1) * 100 - 1 }
+      : { anio: (a - 1) * 100 + 1, anioFin: b * 100 };
+  }
+  return null;
+}
+function romanoANumero(r) {
+  const v = { i: 1, v: 5, x: 10, l: 50, c: 100 };
+  let total = 0;
+  for (let i = 0; i < r.length; i++) {
+    const a = v[r[i]], b = v[r[i + 1]] || 0;
+    total += a < b ? -a : a;
+  }
+  return total;
+}
+
+function interpretarPeriodo(texto) {
+  const t = normalizar(texto);
+  if (/prehist/.test(t)) return "Prehistoria";
+  if (/antig/.test(t)) return "Edad Antigua";
+  if (/media|medieval/.test(t)) return "Edad Media";
+  if (/modern/.test(t)) return "Edad Moderna";
+  if (/contemp/.test(t)) return "Edad Contemporánea";
+  return null;
+}
+function periodoPorAnio(anio) {
+  if (anio < -3500) return "Prehistoria";
+  if (anio < 476) return "Edad Antigua";
+  if (anio < 1453) return "Edad Media";
+  if (anio < 1789) return "Edad Moderna";
+  return "Edad Contemporánea";
+}
+
+/* Lee todas las pestañas y devuelve los temas encontrados */
+function extraerTemasDoc(pestanas) {
+  const encontrados = [], avisos = [];
+  (pestanas || []).forEach(p => {
+    separarBloques(p.texto).forEach(b => {
+      if (vacio(b.titulo)) { avisos.push(`En la pestaña “${p.titulo}” hay un “TEMA:” sin título; se ignoró.`); return; }
+      const v = b.valores;
+      const d = { titulo: b.titulo, pestana: p.titulo };
+      if (v.id) d.id = slug(limpiarCampoDoc(v.id));
+      CAMPOS_TEXTO_DOC.forEach(c => {
+        const valor = limpiarCampoDoc(v[c], CAMPOS_LISTA_DOC.includes(c));
+        if (!vacio(valor)) d[c] = valor;
+      });
+      if (v.conceptos) {
+        d.conceptos = limpiarCampoDoc(v.conceptos).split(/[,;\n]/)
+          .map(x => x.trim().replace(VINETA_DOC, "")).filter(Boolean);
+      }
+      const anioTexto = limpiarCampoDoc(v.anioTexto).replace(/\n/g, " ").trim();
+      if (anioTexto) {
+        d.fecha = anioTexto;
+        const a = interpretarAnio(anioTexto);
+        if (a) { d.anio = a.anio; if (a.anioFin !== null) d.anioFin = a.anioFin; }
+        else avisos.push(`“${b.titulo}”: no se entendió el AÑO “${anioTexto}”.`);
+      }
+      const perTexto = limpiarCampoDoc(v.periodo).trim();
+      if (perTexto) {
+        const per = interpretarPeriodo(perTexto);
+        if (per) d.periodo = per;
+        else avisos.push(`“${b.titulo}”: no se reconoció el PERIODO “${perTexto}”; se calcula según el año.`);
+      }
+      encontrados.push(d);
+    });
+  });
+  return { encontrados, avisos };
+}
+
+/* Texto que usa el buscador (los mismos campos que los temas originales) */
+function textoBusquedaDoc(t) {
+  return normalizar([t.titulo, t.fecha, t.periodo, t.contexto, t.queEs, t.comoFunciona, t.causas, t.proceso,
+    t.importancia, t.consecuencias, t.conexion, t.ideaClave, t.autor, t.respuestaOral,
+    t.acontecimiento, t.queCambia, t.lema,
+    Array.isArray(t.conceptosClave) ? t.conceptosClave.join(" ") : t.conceptosClave].join(" "));
+}
+
+/* Rearma la línea temporal: temas originales + temas de Google Docs */
+function aplicarTemasDoc(pestanas) {
+  const { encontrados, avisos } = extraerTemasDoc(pestanas);
+  const lista = TEMAS_BASE.map(t => Object.assign({}, t));
+  const porId = new Map(), porTitulo = new Map();
+  const registrar = t => { porId.set(t.id, t); porTitulo.set(slug(t.titulo), t); };
+  lista.forEach(registrar);
+
+  const resultado = new Map();   // id → { id, titulo, fecha, tipo }
+  let extra = 0;
+
+  encontrados.forEach(d => {
+    const idDoc = d.id || slug(d.titulo);
+    const existente = (d.id && porId.get(d.id)) || porId.get(idDoc) || porTitulo.get(slug(d.titulo));
+
+    if (existente) {
+      // Completar / actualizar el tema existente sin duplicarlo
+      CAMPOS_TEXTO_DOC.forEach(c => { if (!vacio(d[c])) existente[c] = d[c]; });
+      if (d.conceptos && d.conceptos.length) {
+        existente.conceptosClave = [...new Set([].concat(existente.conceptosClave || [], d.conceptos))];
+      }
+      if (d.periodo) existente.periodo = d.periodo;
+      if (!vacio(d.fecha) && typeof d.anio === "number") {
+        // Si el año es el mismo, se conserva la posición exacta que ya tenía
+        if (Math.floor(existente.anio) !== d.anio) existente.anio = d.anio;
+        if (typeof d.anioFin === "number") existente.anioFin = d.anioFin; else delete existente.anioFin;
+        existente.fecha = d.fecha;
+        delete existente.fechaCorta;
+      }
+      existente.desdeDoc = true;
+      existente.notaDoc = `Este tema se actualizó con tus apuntes de Google Docs (pestaña “${d.pestana}”).`;
+      if (!resultado.has(existente.id) || resultado.get(existente.id).tipo !== "nuevo") {
+        resultado.set(existente.id, { id: existente.id, titulo: existente.titulo, fecha: existente.fecha, tipo: "actualizado" });
+      } else {
+        resultado.get(existente.id).fecha = existente.fecha;
+      }
+      return;
+    }
+
+    if (typeof d.anio !== "number") {
+      avisos.push(`“${d.titulo}” no se agregó a la línea temporal porque le falta un AÑO válido.`);
+      return;
+    }
+    const nuevo = {
+      id: idDoc || ("doc-" + (extra + 1)),
+      anio: d.anio,
+      fecha: d.fecha,
+      titulo: d.titulo,
+      periodo: d.periodo || periodoPorAnio(d.anio),
+      desdeDoc: true,
+      notaDoc: `Este tema viene de tus apuntes de Google Docs (pestaña “${d.pestana}”).`,
+      _i: 100000 + (extra++)
+    };
+    if (typeof d.anioFin === "number") nuevo.anioFin = d.anioFin;
+    CAMPOS_TEXTO_DOC.forEach(c => { if (!vacio(d[c])) nuevo[c] = d[c]; });
+    if (d.conceptos && d.conceptos.length) nuevo.conceptosClave = d.conceptos;
+    lista.push(nuevo);
+    registrar(nuevo);
+    resultado.set(nuevo.id, { id: nuevo.id, titulo: nuevo.titulo, fecha: nuevo.fecha, tipo: "nuevo" });
+  });
+
+  // Mismo orden que la línea original
+  lista.forEach(t => { t._texto = textoBusquedaDoc(t); });
+  lista.sort((a, b) => (a.anio - b.anio) || ((b.hito ? 1 : 0) - (a.hito ? 1 : 0)) || (a._i - b._i));
+  TEMAS.length = 0;
+  lista.forEach(t => TEMAS.push(t));
+
+  resumenDoc = { temas: [...resultado.values()], avisos };
+  refrescarLineaTrasDoc();
+}
+
+/* Vuelve a dibujar la línea sin perder la posición en la que estabas */
+function refrescarLineaTrasDoc() {
+  const izquierda = track.scrollLeft;
+  aplicarFiltros();
+  track.scrollLeft = izquierda;
+  actualizarNavegacion();
+  // Si la ventana de un tema está abierta (y no estás escribiendo una nota), se actualiza
+  if (dlg.open && actualId && TEMAS.some(t => t.id === actualId) &&
+      !(document.activeElement && document.activeElement.id === "notaTema")) {
+    renderModal();
+  }
+}
+
+function htmlResumenDoc() {
+  if (!resumenDoc) return "";
+  if (resumenDoc.error) return `<div class="vivo-temas"><p>No se pudieron procesar los bloques “TEMA:”. La línea temporal sigue con sus temas originales.</p></div>`;
+  const nuevos = resumenDoc.temas.filter(t => t.tipo === "nuevo").length;
+  const act = resumenDoc.temas.length - nuevos;
+  let h = `<div class="vivo-temas">`;
+  if (!resumenDoc.temas.length) {
+    h += `<p><strong>Línea temporal:</strong> no se encontraron bloques que empiecen con “TEMA:”. Por ahora el texto se muestra solo acá.</p>`;
+  } else {
+    h += `<p><strong>Línea temporal:</strong> ${resumenDoc.temas.length === 1 ? "se tomó 1 tema" : "se tomaron " + resumenDoc.temas.length + " temas"} de tus apuntes (${nuevos} ${nuevos === 1 ? "nuevo" : "nuevos"}, ${act} ${act === 1 ? "actualizado" : "actualizados"}). Tocá uno para verlo en la línea.</p><ul>`;
+    h += resumenDoc.temas.map(t => `<li><span class="tipo ${t.tipo === "nuevo" ? "" : "act"}">${t.tipo === "nuevo" ? "Nuevo" : "Actualizado"}</span><button data-ir-tema="${esc(t.id)}">${esc(t.fecha || "")} · ${esc(t.titulo)}</button></li>`).join("");
+    h += `</ul>`;
+  }
+  if (resumenDoc.avisos.length) h += `<ul class="avisos">${resumenDoc.avisos.map(a => `<li>${esc(a)}</li>`).join("")}</ul>`;
+  return h + `</div>`;
+}
+
+/* Desde el resumen, ir al tema en la línea */
+$("#vivoContenido").addEventListener("click", e => {
+  const b = e.target.closest("[data-ir-tema]");
+  if (!b) return;
+  const id = b.dataset.irTema;
+  cerrarVivo();
+  if (!elDeTema(id)) limpiarFiltros();   // por si un filtro lo estaba ocultando
+  setTimeout(() => irATema(id), 280);
+});
 
 function abrirVivo() {
   document.body.classList.add("vivo-open");
